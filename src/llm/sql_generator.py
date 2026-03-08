@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser , JsonOutputParser
 from dotenv import load_dotenv
 from src.llm.prompt_templates import sql_prompt, validation_prompt, explanation_prompt
 from langchain_core.runnables import RunnablePassthrough
@@ -32,9 +32,9 @@ chain = (
 )
 
 if __name__ ==  "__main__":
-    print(type(chain))
+    json_parser = JsonOutputParser()
 
     question = "What is the total sales for the last month?"
     result = chain.invoke({"question": question})
-    print(result)
+    print(json_parser.parse(result))
     #  py sql_generator.py / py -m src.llm.sql_generator
