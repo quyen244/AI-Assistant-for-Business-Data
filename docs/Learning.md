@@ -325,3 +325,258 @@ PostgreSQL
 ```
 
 ---
+
+
+Bạn đang viết gần đúng rồi, chỉ **thiếu phần ForeignKey và relationship ở bảng `DatasetInsights`**. Mình sẽ giải thích từng dòng để bạn hiểu **cơ chế ORM relation** thay vì chỉ nhớ syntax.
+
+---
+
+# 1️⃣ Bảng `DatasetMetadata`
+
+```python
+class DatasetMetadata(Base):
+    __tablename__ = "datasets"
+```
+
+→ tạo table trong database:
+
+```
+datasets
+```
+
+---
+
+## Các cột dữ liệu
+
+```python
+id = Column(Integer, primary_key=True, index=True)
+```
+
+Primary key của bảng.
+
+Database sẽ tạo:
+
+```
+id SERIAL PRIMARY KEY
+```
+
+---
+
+```python
+filename = Column(String(255), nullable=False)
+```
+
+Tên file CSV user upload.
+
+Ví dụ:
+
+```
+sales.csv
+hospital_data.csv
+```
+
+---
+
+```python
+columns = Column(JSON, nullable=False)
+```
+
+Bạn lưu danh sách column.
+
+Ví dụ:
+
+```json
+["Region","Country","Item Type","Sales"]
+```
+
+---
+
+```python
+statistics = Column(JSON, nullable=False)
+```
+
+Bạn lưu statistics của dataset.
+
+Ví dụ:
+
+```json
+{
+ "numeric":{
+   "sales":{
+     "mean":200,
+     "std":40
+   }
+ }
+}
+```
+
+---
+
+```python
+sample_data = Column(JSON, nullable=False)
+```
+
+Ví dụ:
+
+```json
+[
+  {
+    "Region": "Asia",
+    "Country": "Vietnam",
+    "Sales": 200
+  }
+]
+```
+
+---
+
+```python
+created_at = Column(DateTime, default=datetime.now)
+```
+
+Tự động lưu thời gian dataset được upload.
+
+---
+
+# 2️⃣ Relationship quan trọng nhất
+
+```python
+insights = relationship(
+    "DatasetInsights",
+    back_populates="dataset",
+    cascade="all, delete"
+)
+```
+
+Ý nghĩa:
+
+```
+DatasetMetadata 1 ---- N DatasetInsights
+```
+
+Một dataset có thể có nhiều insights.
+
+Ví dụ:
+
+```
+Dataset: sales.csv
+```
+
+Insights:
+
+```
+1. Europe has highest revenue
+2. Cosmetics dominate sales
+3. Seasonal trend detected
+```
+
+---
+
+## ORM sẽ tạo property Python
+
+Sau khi query dataset:
+
+```python
+dataset = db.query(DatasetMetadata).first()
+```
+
+Bạn có thể gọi:
+
+```python
+dataset.insights
+```
+
+# 7️⃣ ORM magic (rất mạnh)
+
+Bạn cũng có thể viết:
+
+```python
+dataset = DatasetMetadata(...)
+
+insight = DatasetInsights(
+    summary="Europe dominates sales",
+    insights=[...]
+)
+
+dataset.insights.append(insight)
+
+db.add(dataset)
+db.commit()
+```
+
+ORM sẽ **tự động set**
+
+```
+dataset_id = dataset.id
+```
+
+---
+
+# 8️⃣ `back_populates` hoạt động thế nào
+
+```
+DatasetMetadata.insights
+          ↕
+
+DatasetInsights.dataset
+```
+
+Ví dụ:
+
+### từ dataset → insights
+
+```python
+dataset.insights
+```
+
+### từ insight → dataset
+
+```python
+insight.dataset
+```
+
+---
+
+# 9️⃣ `cascade="all, delete"`
+
+Nếu bạn xóa dataset:
+
+```python
+db.delete(dataset)
+db.commit()
+```
+
+ORM sẽ **xóa luôn insights**.
+
+Database:
+
+```
+datasets_insights rows removed
+```
+
+---
+
+# 🔟 Mental model (quan trọng)
+
+SQLAlchemy có **2 layer relationship**
+
+### Database level
+
+```
+ForeignKey("datasets.id")
+```
+
+đảm bảo dữ liệu hợp lệ.
+
+---
+
+### Python ORM level
+
+```
+relationship()
+```
+
+để truy cập object.
+
+---
+
