@@ -52,9 +52,12 @@ def generate_and_get_insights(file : UploadFile = File(...) , db : Session = Dep
     # create and save insights
     res = generate_insights(metadata)
 
+    res['insights'] = res['insights'].model_dump()['insights']
+
     dataset_insights = DatasetInsights(
         dataset_id=dataset_metadata.id,
-        **res
+        summary=res["summary"],
+        insights=res["insights"]
     )
 
     db.add(dataset_insights)

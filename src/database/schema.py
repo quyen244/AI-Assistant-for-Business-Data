@@ -1,7 +1,5 @@
-from pydantic import BaseModel , Field
-from typing import Optional, List , Dict
-from sqlalchemy import Column, DateTime, Integer, String, Text , JSON
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, DateTime, Integer, String, Text , JSON , ForeignKey
+from sqlalchemy.orm import declarative_base , relationship
 from datetime import datetime
 
 Base = declarative_base()
@@ -23,11 +21,24 @@ class DatasetMetadata(Base):
 
     created_at = Column(DateTime, default=datetime.now)
 
+    insights = relationship(
+        "DatasetInsights",
+        back_populates="dataset",
+        cascade="all, delete"
+    )
+
 class DatasetInsights(Base):
     __tablename__ = 'datasets_insights'
 
     id = Column(Integer, primary_key = True, index = True)
 
+    dataset_id = Column(Integer, ForeignKey("datasets.id"))
+
     summary = Column(Text, nullable = False)
 
     insights = Column(JSON, nullable = False)
+
+    dataset = relationship(
+        "DatasetMetadata",
+         back_populates="insights"
+    )

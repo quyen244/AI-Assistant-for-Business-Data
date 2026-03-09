@@ -428,17 +428,14 @@ Ví dụ:
 ]
 ```
 
----
 
-```python
-created_at = Column(DateTime, default=datetime.now)
-```
 
-Tự động lưu thời gian dataset được upload.
 
----
+# ORM 
 
-# 2️⃣ Relationship quan trọng nhất
+Câu này nhiều người mới học **SQLAlchemy ORM** cũng thắc mắc. Thực ra dòng này không phải “viết cho đúng syntax”, mà nó tạo **một thuộc tính Python để truy cập dữ liệu liên quan**.
+
+Ta phân tích từng phần:
 
 ```python
 insights = relationship(
@@ -448,135 +445,337 @@ insights = relationship(
 )
 ```
 
-Ý nghĩa:
-
-```
-DatasetMetadata 1 ---- N DatasetInsights
-```
-
-Một dataset có thể có nhiều insights.
-
-Ví dụ:
-
-```
-Dataset: sales.csv
-```
-
-Insights:
-
-```
-1. Europe has highest revenue
-2. Cosmetics dominate sales
-3. Seasonal trend detected
-```
-
 ---
 
-## ORM sẽ tạo property Python
+# 1️⃣ `insights =` là gì?
 
-Sau khi query dataset:
+Đây là **tên thuộc tính Python** mà ORM tạo ra cho object.
+
+Ví dụ:
 
 ```python
 dataset = db.query(DatasetMetadata).first()
 ```
 
-Bạn có thể gọi:
+bạn có thể gọi:
 
 ```python
 dataset.insights
 ```
 
-# 7️⃣ ORM magic (rất mạnh)
-
-Bạn cũng có thể viết:
+và ORM sẽ trả về:
 
 ```python
-dataset = DatasetMetadata(...)
-
-insight = DatasetInsights(
-    summary="Europe dominates sales",
-    insights=[...]
-)
-
-dataset.insights.append(insight)
-
-db.add(dataset)
-db.commit()
+[
+  DatasetInsights(...),
+  DatasetInsights(...)
+]
 ```
 
-ORM sẽ **tự động set**
+Nghĩa là:
 
+```text
+dataset.insights = list các insight thuộc dataset đó
 ```
-dataset_id = dataset.id
+
+Tên này **bạn tự đặt**, miễn là dễ hiểu.
+
+Ví dụ cũng hợp lệ:
+
+```python
+dataset_insights = relationship(...)
+```
+
+hoặc
+
+```python
+analysis = relationship(...)
+```
+
+Nhưng convention thường đặt:
+
+```text
+one-to-many → plural
+many-to-one → singular
+```
+
+Nên:
+
+```text
+DatasetMetadata.insights   (plural)
+DatasetInsights.dataset    (singular)
 ```
 
 ---
 
-# 8️⃣ `back_populates` hoạt động thế nào
+# 2️⃣ `"DatasetInsights"` là gì?
 
+```python
+relationship("DatasetInsights")
 ```
-DatasetMetadata.insights
-          ↕
 
+Đây là **tên class ORM** của bảng liên kết.
+
+SQLAlchemy sẽ hiểu:
+
+```text
+DatasetMetadata liên kết với DatasetInsights
+```
+
+Bạn viết string thay vì class trực tiếp để tránh lỗi **circular import**.
+
+Ví dụ:
+
+```python
+relationship(DatasetInsights)  ❌ đôi khi lỗi import
+relationship("DatasetInsights") ✅ safe
+```
+
+---
+
+# 3️⃣ `back_populates="dataset"` là gì?
+
+Đây là **liên kết 2 chiều**.
+
+Bạn có:
+
+### Table 1
+
+```python
+class DatasetMetadata(Base):
+
+    insights = relationship(
+        "DatasetInsights",
+        back_populates="dataset"
+    )
+```
+
+### Table 2
+
+```python
+class DatasetInsights(Base):
+
+    dataset = relationship(
+        "DatasetMetadata",
+        back_populates="insights"
+    )
+```
+
+Hai dòng này **trỏ vào nhau**.
+
+Quan hệ:
+
+```text
+DatasetMetadata.insights
+        ↕
 DatasetInsights.dataset
 ```
 
-Ví dụ:
+---
+
+## Ví dụ truy cập
 
 ### từ dataset → insights
 
 ```python
+dataset = db.query(DatasetMetadata).first()
+
 dataset.insights
 ```
+
+---
 
 ### từ insight → dataset
 
 ```python
+insight = db.query(DatasetInsights).first()
+
 insight.dataset
 ```
 
 ---
 
-# 9️⃣ `cascade="all, delete"`
+# 4️⃣ `cascade="all, delete"` là gì?
 
-Nếu bạn xóa dataset:
+Cascade nghĩa là **lan truyền hành động**.
+
+```python
+cascade="all, delete"
+```
+
+Nghĩa là nếu bạn xóa dataset:
 
 ```python
 db.delete(dataset)
 db.commit()
 ```
 
-ORM sẽ **xóa luôn insights**.
+thì ORM sẽ **tự động xóa insights liên quan**.
+
+Ví dụ:
+
+```text
+datasets
+-------
+id = 1
+filename = sales.csv
+```
+
+```text
+datasets_insights
+-------
+dataset_id = 1
+summary = ...
+```
+
+Sau khi delete dataset:
+
+```text
+datasets → row removed
+datasets_insights → rows removed automatically
+```
+
+---
+
+# 5️⃣ Quan hệ thực sự nằm ở đâu?
+
+Nhiều người nghĩ `relationship()` tạo relation trong database.
+
+❌ Không phải.
+
+Quan hệ database nằm ở:
+
+```python
+dataset_id = Column(
+    Integer,
+    ForeignKey("datasets.id")
+)
+```
+
+`relationship()` chỉ giúp **ORM truy cập object dễ hơn**.
+
+---
+
+# 6️⃣ Mental model rất quan trọng
+
+Hãy nhớ:
+
+```
+ForeignKey → database level relation
+relationship → python object relation
+```
+
+---
+
+## Ví dụ
 
 Database:
 
 ```
-datasets_insights rows removed
+datasets
+-------
+id
+filename
+```
+
+```
+datasets_insights
+-------
+id
+dataset_id
+summary
+```
+
+ORM:
+
+```
+dataset.insights
+insight.dataset
 ```
 
 ---
 
-# 🔟 Mental model (quan trọng)
+# 7️⃣ Ví dụ trực quan
 
-SQLAlchemy có **2 layer relationship**
-
-### Database level
+Giả sử database có:
 
 ```
-ForeignKey("datasets.id")
+Dataset
+-------
+id = 1
+filename = sales.csv
 ```
 
-đảm bảo dữ liệu hợp lệ.
+```
+Insights
+-------
+id = 1
+dataset_id = 1
+summary = Europe dominates sales
+```
+
+Python:
+
+```python
+dataset = db.query(DatasetMetadata).first()
+```
+
+```python
+dataset.insights
+```
+
+→ ORM chạy SQL:
+
+```sql
+SELECT * 
+FROM datasets_insights
+WHERE dataset_id = 1
+```
 
 ---
 
-### Python ORM level
+# 8️⃣ Vì sao phải viết `relationship()`?
 
-```
+Nếu không có:
+
+```python
 relationship()
 ```
 
-để truy cập object.
+bạn sẽ phải query thủ công:
+
+```python
+db.query(DatasetInsights).filter(
+    DatasetInsights.dataset_id == dataset.id
+)
+```
+
+ORM giúp bạn viết đơn giản:
+
+```python
+dataset.insights
+```
+
+---
+
+# 9️⃣ Tóm tắt
+
+```python
+insights = relationship(
+    "DatasetInsights",
+    back_populates="dataset",
+    cascade="all, delete"
+)
+```
+
+ý nghĩa:
+
+| Phần              | Ý nghĩa               |
+| ----------------- | --------------------- |
+| insights          | tên thuộc tính Python |
+| "DatasetInsights" | bảng liên kết         |
+| back_populates    | liên kết 2 chiều      |
+| cascade           | delete liên quan      |
 
 ---
 
