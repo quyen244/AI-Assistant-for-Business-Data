@@ -100,13 +100,7 @@ if __name__ == "__main__":
         "samples": [{"Region": "Europe", "Country": "Czech Republic", "Order ID": 478051030, "Item Type": "Beverages", "Ship Date": "9/29/2011", "Unit Cost": 31.79, "Order Date": "9/12/2011", "Total Cost": 151892.62, "Unit Price": 47.45, "Units Sold": 4778, "Total Profit": 74823.48, "Sales Channel": "Offline", "Total Revenue": 226716.1, "Order Priority": "C"}]
     }
     res = generate_insights(metadata)
-
-    res["insights"] = [
-        insight.dict()
-        for insight in res["insights"]
-    ]
-
-
+    
     print(type(res))
     
     print(res)
